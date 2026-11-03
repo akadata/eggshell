@@ -145,102 +145,6 @@ func (f *File) stat() *Inode {
 	return f.anonInode()
 }
 
-func (t *Task) read(f *File, addr uint64, count uint64, off int64, positional_ bool) (uint64, Errno) {
-	if !f.readable() {
-		return fail(EBADF)
-	}
-
-	if count > ioChunk {
-		count = ioChunk
-	}
-
-	buf, p := getIOBuf(count)
-	defer putIOBuf(p)
-
-	var n int
-	var err Errno
-
-	if positional_ {
-		p, ok := f.ops.(positional)
-
-		if !ok {
-			return fail(ESPIPE)
-		}
-
-		n, err = p.ReadAt(t, f, buf, off)
-	} else {
-		n, err = f.ops.Read(t, f, buf)
-	}
-
-	if err != 0 {
-		return fail(err)
-	}
-
-	if n > 0 {
-		if err = t.proc.mm.copyOut(addr, buf[:n]); err != 0 {
-			return fail(err)
-		}
-	}
-
-	return ok(n)
-}
-
-func (t *Task) write(f *File, addr uint64, count uint64, off int64, positional_ bool) (uint64, Errno) {
-	if !f.writable() {
-		return fail(EBADF)
-	}
-
-	total := 0
-
-	b, p := getIOBuf(min(count, ioChunk))
-	defer putIOBuf(p)
-
-	for count > 0 {
-		chunk := min(count, ioChunk)
-
-		buf := b[:chunk]
-
-		if err := t.proc.mm.copyIn(addr, buf); err != 0 {
-			if total > 0 {
-				break
-			}
-			return fail(err)
-		}
-
-		var n int
-		var err Errno
-
-		if positional_ {
-			p, ok := f.ops.(positional)
-
-			if !ok {
-				return fail(ESPIPE)
-			}
-
-			n, err = p.WriteAt(t, f, buf, off+int64(total))
-		} else {
-			n, err = f.ops.Write(t, f, buf)
-		}
-
-		if err != 0 {
-			if total > 0 {
-				break
-			}
-			return fail(err)
-		}
-
-		total += n
-		addr += uint64(n)
-		count -= uint64(n)
-
-		if uint64(n) < chunk {
-			break
-		}
-	}
-
-	return ok(total)
-}
-
 // iovec represents the struct iovec.
 type iovec struct {
 	Base uint64
@@ -264,29 +168,21 @@ func (t *Task) iovecs(addr uint64, cnt uint64) ([]iovec, Errno) {
 	return iov, 0
 }
 
-// gather reads the contents of an I/O vector, in a buffer to be released
-// with putIOBuf.
+// gather reads the contents of an I/O vector, up to ioChunk bytes, in a
+// buffer to be released with putIOBuf.
 func (t *Task) gather(iov []iovec) ([]byte, *[]byte, Errno) {
-	var n uint64
-
-	for _, v := range iov {
-		if v.Len > 16*ioChunk-n {
-			return nil, nil, EINVAL
-		}
-
-		n += v.Len
-	}
-
-	buf, p := getIOBuf(n)
+	buf, p := getIOBuf(min(iovLen(iov), ioChunk))
 	off := uint64(0)
 
 	for _, v := range iov {
-		if err := t.proc.mm.copyIn(v.Base, buf[off:off+v.Len]); err != 0 {
+		n := min(v.Len, uint64(len(buf))-off)
+
+		if err := t.proc.mm.copyIn(v.Base, buf[off:off+n]); err != 0 {
 			putIOBuf(p)
 			return nil, nil, err
 		}
 
-		off += v.Len
+		off += n
 	}
 
 	return buf, p, 0
@@ -345,7 +241,11 @@ func (t *Task) readv(f *File, iov []iovec, off int64, pos bool) (uint64, Errno) 
 		return fail(err)
 	}
 
-	return uint64(int64(r)), t.scatter(iov, buf[:r])
+	if err = t.scatter(iov, buf[:r]); err != 0 {
+		return fail(err)
+	}
+
+	return ok(r)
 }
 
 func (t *Task) writev(f *File, iov []iovec, off int64, pos bool) (uint64, Errno) {
@@ -353,37 +253,68 @@ func (t *Task) writev(f *File, iov []iovec, off int64, pos bool) (uint64, Errno)
 		return fail(EBADF)
 	}
 
-	buf, p, err := t.gather(iov)
+	pf, positional_ := f.ops.(positional)
 
-	if err != 0 {
-		return fail(err)
+	if pos && !positional_ {
+		return fail(ESPIPE)
 	}
 
+	buf, p := getIOBuf(min(iovLen(iov), ioChunk))
 	defer putIOBuf(p)
 
-	if len(buf) == 0 {
-		return ok(0)
-	}
+	total := 0
 
-	var n int
+	// write the vector in chunks of up to ioChunk bytes
+	for len(iov) > 0 {
+		n := 0
 
-	if pos {
-		p, ok := f.ops.(positional)
+		for len(iov) > 0 && n < len(buf) {
+			c := min(iov[0].Len, uint64(len(buf)-n))
 
-		if !ok {
-			return fail(ESPIPE)
+			if err := t.proc.mm.copyIn(iov[0].Base, buf[n:n+int(c)]); err != 0 {
+				if total > 0 {
+					return ok(total)
+				}
+				return fail(err)
+			}
+
+			n += int(c)
+			iov[0].Base += c
+			iov[0].Len -= c
+
+			if iov[0].Len == 0 {
+				iov = iov[1:]
+			}
 		}
 
-		n, err = p.WriteAt(t, f, buf, off)
-	} else {
-		n, err = f.ops.Write(t, f, buf)
+		if n == 0 {
+			break
+		}
+
+		var w int
+		var err Errno
+
+		if pos {
+			w, err = pf.WriteAt(t, f, buf[:n], off+int64(total))
+		} else {
+			w, err = f.ops.Write(t, f, buf[:n])
+		}
+
+		if err != 0 {
+			if total > 0 {
+				break
+			}
+			return fail(err)
+		}
+
+		total += w
+
+		if w < n {
+			break
+		}
 	}
 
-	if err != 0 {
-		return fail(err)
-	}
-
-	return ok(n)
+	return ok(total)
 }
 
 func (t *Task) getdents(f *File, addr uint64, count uint64) (uint64, Errno) {
@@ -785,117 +716,45 @@ func registerFSSyscalls() {
 		return ok(0)
 	})
 
-	reg(SYS_READ, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
+	// read(2), write(2) and their positional and vector variants
+	rw := func(write bool, vec bool, pos bool) func(t *Task, a *[6]uint64) (uint64, Errno) {
+		return func(t *Task, a *[6]uint64) (uint64, Errno) {
+			f, err := t.file(a[0])
 
-		if err != 0 {
-			return fail(err)
+			if err != 0 {
+				return fail(err)
+			}
+
+			iov := []iovec{{Base: a[1], Len: a[2]}}
+
+			if vec {
+				if iov, err = t.iovecs(a[1], a[2]); err != 0 {
+					return fail(err)
+				}
+			}
+
+			off := int64(a[3])
+
+			if pos && off < 0 {
+				return fail(EINVAL)
+			}
+
+			if write {
+				return t.writev(f, iov, off, pos)
+			}
+
+			return t.readv(f, iov, off, pos)
 		}
+	}
 
-		return t.read(f, a[1], a[2], 0, false)
-	})
-
-	reg(SYS_WRITE, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		return t.write(f, a[1], a[2], 0, false)
-	})
-
-	reg(SYS_PREAD64, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		if int64(a[3]) < 0 {
-			return fail(EINVAL)
-		}
-
-		return t.read(f, a[1], a[2], int64(a[3]), true)
-	})
-
-	reg(SYS_PWRITE64, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		if int64(a[3]) < 0 {
-			return fail(EINVAL)
-		}
-
-		return t.write(f, a[1], a[2], int64(a[3]), true)
-	})
-
-	reg(SYS_READV, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		iov, err := t.iovecs(a[1], a[2])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		return t.readv(f, iov, 0, false)
-	})
-
-	reg(SYS_WRITEV, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		iov, err := t.iovecs(a[1], a[2])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		return t.writev(f, iov, 0, false)
-	})
-
-	reg(SYS_PREADV, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		iov, err := t.iovecs(a[1], a[2])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		return t.readv(f, iov, int64(a[3]), true)
-	})
-
-	reg(SYS_PWRITEV, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, err := t.file(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		iov, err := t.iovecs(a[1], a[2])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		return t.writev(f, iov, int64(a[3]), true)
-	})
+	reg(SYS_READ, rw(false, false, false))
+	reg(SYS_WRITE, rw(true, false, false))
+	reg(SYS_PREAD64, rw(false, false, true))
+	reg(SYS_PWRITE64, rw(true, false, true))
+	reg(SYS_READV, rw(false, true, false))
+	reg(SYS_WRITEV, rw(true, true, false))
+	reg(SYS_PREADV, rw(false, true, true))
+	reg(SYS_PWRITEV, rw(true, true, true))
 
 	reg(SYS_LSEEK, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		f, err := t.file(a[0])
@@ -1420,22 +1279,6 @@ func registerFSSyscalls() {
 		})
 	}
 
-	reg(SYS_SYNC, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_FADVISE64, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_READAHEAD, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_FLOCK, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
 	reg(SYS_FCNTL, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		return t.fcntl(int(int32(a[0])), int(a[1]), a[2])
 	})
@@ -1580,10 +1423,6 @@ func registerFSSyscalls() {
 		return ok(0)
 	})
 
-	reg(SYS_CHROOT, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(EPERM)
-	})
-
 	reg(SYS_STATFS, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		p, err := t.str(a[0])
 
@@ -1608,14 +1447,6 @@ func registerFSSyscalls() {
 		}
 
 		return uint64(int64(0)), t.statfs(a[1], f.stat())
-	})
-
-	reg(SYS_MOUNT, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(EPERM)
-	})
-
-	reg(SYS_UMOUNT2, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(EPERM)
 	})
 
 	reg(SYS_SENDFILE, func(t *Task, a *[6]uint64) (uint64, Errno) {

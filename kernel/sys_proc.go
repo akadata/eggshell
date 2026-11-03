@@ -269,22 +269,10 @@ func registerProcSyscalls() {
 		return ok(t.tid)
 	})
 
-	reg(SYS_SET_ROBUST_LIST, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_GET_ROBUST_LIST, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(ENOSYS)
-	})
-
 	reg(SYS_CLONE, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		flags, sp, ptid, ctid, tls := cloneArgs(a)
 		tid, err := t.clone(flags, sp, ptid, tls, ctid)
 		return uint64(int64(tid)), err
-	})
-
-	reg(SYS_CLONE3, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(ENOSYS)
 	})
 
 	reg(SYS_EXECVE, func(t *Task, a *[6]uint64) (uint64, Errno) {
@@ -869,40 +857,8 @@ func registerProcSyscalls() {
 		return uint64(int64(8)), t.proc.mm.writeU64(a[2], 1)
 	})
 
-	reg(SYS_SCHED_SETAFFINITY, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_SCHED_GETSCHEDULER, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_SCHED_SETSCHEDULER, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
 	reg(SYS_SCHED_GETPARAM, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		return uint64(int64(0)), t.proc.mm.writeU32(a[1], 0)
-	})
-
-	reg(SYS_SCHED_SETPARAM, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_SCHED_GET_PRIORITY_MAX, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_SCHED_GET_PRIORITY_MIN, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_GETPRIORITY, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(20)
-	})
-
-	reg(SYS_SETPRIORITY, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
 	})
 
 	reg(SYS_GETCPU, func(t *Task, a *[6]uint64) (uint64, Errno) {
@@ -1037,10 +993,6 @@ func registerProcSyscalls() {
 		return uint64(int64(0)), t.proc.mm.copyOut(a[1], timespec(100))
 	})
 
-	reg(SYS_CLOCK_SETTIME, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(EPERM)
-	})
-
 	reg(SYS_GETTIMEOFDAY, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		if a[0] != 0 {
 			if err := t.proc.mm.copyOut(a[0], timeval(time.Now().UnixNano())); err != 0 {
@@ -1131,14 +1083,6 @@ func registerProcSyscalls() {
 		return uint64(int64(int(n))), t.proc.mm.copyOut(a[0], b)
 	})
 
-	reg(SYS_MEMBARRIER, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return ok(0)
-	})
-
-	reg(SYS_RSEQ, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		return fail(ENOSYS)
-	})
-
 	reg(SYS_CAPGET, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		if a[1] != 0 {
 			b := make([]byte, 24)
@@ -1150,10 +1094,6 @@ func registerProcSyscalls() {
 
 			return uint64(int64(0)), t.proc.mm.copyOut(a[1], b)
 		}
-		return ok(0)
-	})
-
-	reg(SYS_CAPSET, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		return ok(0)
 	})
 

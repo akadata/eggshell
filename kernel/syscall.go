@@ -22,6 +22,21 @@ func init() {
 	registerPollSyscalls()
 	registerNetSyscalls()
 
+	// accepted and ignored
+	regResult(0, 0,
+		SYS_SYNC, SYS_FADVISE64, SYS_READAHEAD, SYS_FLOCK,
+		SYS_SET_ROBUST_LIST, SYS_MEMBARRIER, SYS_CAPSET,
+		SYS_SCHED_SETAFFINITY, SYS_SCHED_GETSCHEDULER, SYS_SCHED_SETSCHEDULER,
+		SYS_SCHED_SETPARAM, SYS_SCHED_GET_PRIORITY_MAX, SYS_SCHED_GET_PRIORITY_MIN,
+		SYS_SETPRIORITY,
+	)
+
+	// nice value 0
+	regResult(20, 0, SYS_GETPRIORITY)
+
+	regResult(0, EPERM, SYS_CHROOT, SYS_MOUNT, SYS_UMOUNT2, SYS_CLOCK_SETTIME)
+	regResult(0, ENOSYS, SYS_GET_ROBUST_LIST, SYS_CLONE3, SYS_RSEQ)
+
 	// architecture specific and legacy system calls, which might alias
 	// the generic ones
 	registerArchSyscalls()
@@ -29,6 +44,13 @@ func init() {
 
 func reg(num uint64, fn syscallFn) {
 	syscallTable[num] = fn
+}
+
+// regResult registers system calls with a fixed result.
+func regResult(ret uint64, err Errno, nums ...uint64) {
+	for _, num := range nums {
+		reg(num, func(*Task, *[6]uint64) (uint64, Errno) { return ret, err })
+	}
 }
 
 // syscall services a system call trapped from user mode, following the Linux

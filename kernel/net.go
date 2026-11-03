@@ -637,6 +637,52 @@ func (t *Task) readMsghdr(addr uint64, h *msghdr) Errno {
 	return 0
 }
 
+// send sends the contents of an I/O vector on a socket.
+func (t *Task) send(fd uint64, iov []iovec, flags int, addr []byte) (uint64, Errno) {
+	f, s, err := t.sockFD(fd)
+
+	if err != 0 {
+		return fail(err)
+	}
+
+	buf, p, err := t.gather(iov)
+
+	if err != 0 {
+		return fail(err)
+	}
+
+	defer putIOBuf(p)
+
+	n, err := s.sendto(t, f, buf, flags, addr)
+
+	return uint64(int64(n)), err
+}
+
+// recv receives data from a socket to an I/O vector, it returns the length
+// reported by the socket and the sender address.
+func (t *Task) recv(fd uint64, iov []iovec, flags int) (int, []byte, Errno) {
+	f, s, err := t.sockFD(fd)
+
+	if err != 0 {
+		return 0, nil, err
+	}
+
+	buf, p := getIOBuf(min(iovLen(iov), ioChunk))
+	defer putIOBuf(p)
+
+	n, from, err := s.recvfrom(t, f, buf, flags)
+
+	if err != 0 {
+		return 0, nil, err
+	}
+
+	if err := t.scatter(iov, buf[:min(n, len(buf))]); err != 0 {
+		return 0, nil, err
+	}
+
+	return n, from, 0
+}
+
 func registerNetSyscalls() {
 	reg(SYS_SOCKET, func(t *Task, a *[6]uint64) (uint64, Errno) {
 		family := int(a[0])
@@ -802,57 +848,19 @@ func registerNetSyscalls() {
 	})
 
 	reg(SYS_SENDTO, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, s, err := t.sockFD(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		if a[2] > ioChunk {
-			a[2] = ioChunk
-		}
-
-		buf, p := getIOBuf(a[2])
-		defer putIOBuf(p)
-
-		if err := t.proc.mm.copyIn(a[1], buf); err != 0 {
-			return fail(err)
-		}
-
 		addr, err := t.readSockaddr(a[4], a[5])
 
 		if err != 0 {
 			return fail(err)
 		}
 
-		n, err := s.sendto(t, f, buf, int(a[3]), addr)
-
-		return uint64(int64(n)), err
+		return t.send(a[0], []iovec{{Base: a[1], Len: a[2]}}, int(a[3]), addr)
 	})
 
 	reg(SYS_RECVFROM, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, s, err := t.sockFD(a[0])
+		n, from, err := t.recv(a[0], []iovec{{Base: a[1], Len: a[2]}}, int(a[3]))
 
 		if err != 0 {
-			return fail(err)
-		}
-
-		if a[2] > ioChunk {
-			a[2] = ioChunk
-		}
-
-		buf, p := getIOBuf(a[2])
-		defer putIOBuf(p)
-
-		n, from, err := s.recvfrom(t, f, buf, int(a[3]))
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		copied := min(n, len(buf))
-
-		if err := t.proc.mm.copyOut(a[1], buf[:copied]); err != 0 {
 			return fail(err)
 		}
 
@@ -868,12 +876,6 @@ func registerNetSyscalls() {
 	})
 
 	reg(SYS_SENDMSG, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, s, err := t.sockFD(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
 		var hdr msghdr
 
 		if err := t.readMsghdr(a[1], &hdr); err != 0 {
@@ -892,26 +894,10 @@ func registerNetSyscalls() {
 			return fail(err)
 		}
 
-		buf, p, err := t.gather(iov)
-
-		if err != 0 {
-			return fail(err)
-		}
-
-		defer putIOBuf(p)
-
-		n, err := s.sendto(t, f, buf, int(a[2]), addr)
-
-		return uint64(int64(n)), err
+		return t.send(a[0], iov, int(a[2]), addr)
 	})
 
 	reg(SYS_RECVMSG, func(t *Task, a *[6]uint64) (uint64, Errno) {
-		f, s, err := t.sockFD(a[0])
-
-		if err != 0 {
-			return fail(err)
-		}
-
 		mm := t.proc.mm
 
 		var hdr msghdr
@@ -926,18 +912,9 @@ func registerNetSyscalls() {
 			return fail(err)
 		}
 
-		buf, p := getIOBuf(min(iovLen(iov), ioChunk))
-		defer putIOBuf(p)
-
-		n, from, err := s.recvfrom(t, f, buf, int(a[2]))
+		n, from, err := t.recv(a[0], iov, int(a[2]))
 
 		if err != 0 {
-			return fail(err)
-		}
-
-		copied := min(n, len(buf))
-
-		if err := t.scatter(iov, buf[:copied]); err != 0 {
 			return fail(err)
 		}
 

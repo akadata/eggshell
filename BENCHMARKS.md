@@ -29,50 +29,50 @@ Results
 
 | benchmark (KVM) | unit | eggshell | Linux | eggshell vs Linux |
 |---|---|---:|---:|---:|
-| cpu_xorshift_50M | ms | 131.79 | 134.88 | 1.02× faster |
-| clock_gettime | ns | 10.21 | 14.06 | 1.38× faster |
-| thread_create_join | us | 13.16 | 26.27 | 2.00× faster |
-| condvar_pingpong | us | 2.77 | 5.25 | 1.90× faster |
-| page_fault | ns/page | 762.33 | 887.02 | 1.16× faster |
-| memset_bandwidth | MB/s | 42,433.47 | 40,772.32 | 1.04× faster |
-| file_write | MB/s | 8,964.78 | 6,653.44 | 1.35× faster |
-| file_write_4k | MB/s | 5,382.87 | 5,268.54 | 1.02× faster |
-| file_write_64k | MB/s | 10,609.77 | 7,054.33 | 1.50× faster |
-| file_write_1024k | MB/s | 8,722.12 | 6,991.39 | 1.25× faster |
-| shell-loop-100k | ms | 157.10 | 169.40 | 1.08× faster |
-| rm-go-src | ms | 15.20 | 20.70 | 1.36× faster |
-| gunzip-go-binary | ms | 124.90 | 127.80 | 1.02× faster |
-| boot to init | ms | 65.50 | 397.70 | 6.07× faster |
-| null_syscall | ns | 353.58 | 84.49 | 4.18× slower |
-| fork_exit_wait | us | 39.41 | 24.19 | 1.63× slower |
-| fork_exec_wait | us | 352.84 | 121.28 | 2.91× slower |
-| mmap_touch_munmap | us | 3.13 | 2.86 | 1.09× slower |
-| open_close | us | 1.30 | 0.61 | 2.13× slower |
-| stat | us | 1.09 | 0.39 | 2.79× slower |
-| file_read | MB/s | 10,507.17 | 11,491.84 | 1.09× slower |
-| pipe_latency | us | 3.39 | 1.93 | 1.76× slower |
-| unix_latency | us | 3.15 | 3.01 | 1.05× slower |
-| tcp_latency | us | 15.70 | 5.51 | 2.85× slower |
-| pipe_bandwidth | MB/s | 7,914.02 | 10,363.86 | 1.31× slower |
-| unix_bandwidth | MB/s | 8,673.21 | 10,691.17 | 1.23× slower |
-| tcp_bandwidth | MB/s | 3,674.15 | 8,207.08 | 2.23× slower |
-| file_rewrite_4k | MB/s | 5,438.30 | 11,401.17 | 2.10× slower |
-| file_read_4k | MB/s | 5,283.22 | 8,653.95 | 1.64× slower |
-| file_rewrite_64k | MB/s | 10,499.31 | 13,329.59 | 1.27× slower |
-| file_read_64k | MB/s | 10,364.82 | 11,394.62 | 1.10× slower |
-| file_rewrite_1024k | MB/s | 9,251.23 | 14,038.24 | 1.52× slower |
-| file_read_1024k | MB/s | 7,913.93 | 11,242.26 | 1.42× slower |
-| exec-500 | ms | 60.60 | 43.60 | 1.39× slower |
-| exec-dynamic-200 | ms | 35.00 | 26.40 | 1.33× slower |
-| small-files-2000 | ms | 26.90 | 22.50 | 1.20× slower |
-| tar-go-src | ms | 39.90 | 33.70 | 1.18× slower |
-| untar-go-src | ms | 92.80 | 65.70 | 1.41× slower |
-| gzip-go-binary | ms | 956.40 | 945.90 | 1.01× slower |
-| go-build-hello | ms | 12,476.40 | 7,304.50 | 1.71× slower |
-| redis SET | req/s | 46,082.95 | 131,578.95 | 2.86× slower |
-| redis GET | req/s | 45,454.55 | 128,205.12 | 2.82× slower |
-| redis INCR | req/s | 45,454.55 | 125,000.00 | 2.75× slower |
-| redis LPUSH | req/s | 45,248.87 | 113,636.37 | 2.51× slower |
-| redis LRANGE_100 | req/s | 26,315.79 | 39,525.69 | 1.50× slower |
-| redis-p16 SET | req/s | 387,596.91 | 769,230.81 | 1.98× slower |
-| redis-p16 GET | req/s | 526,315.81 | 925,925.88 | 1.76× slower |
+| cpu_xorshift_50M | ms | 131.97 | 138.02 | 1.05× faster |
+| clock_gettime | ns | 10.01 | 15.39 | 1.54× faster |
+| thread_create_join | us | 12.72 | 26.62 | 2.09× faster |
+| condvar_pingpong | us | 2.69 | 6.36 | 2.36× faster |
+| page_fault | ns/page | 775.93 | 877.18 | 1.13× faster |
+| file_write | MB/s | 9,421.81 | 6,818.24 | 1.38× faster |
+| file_write_64k | MB/s | 10,624.66 | 7,155.46 | 1.48× faster |
+| file_write_1024k | MB/s | 8,265.91 | 6,851.58 | 1.21× faster |
+| shell-loop-100k | ms | 154.70 | 162.70 | 1.05× faster |
+| rm-go-src | ms | 15.00 | 20.80 | 1.39× faster |
+| gzip-go-binary | ms | 917.80 | 921.20 | 1.00× faster |
+| boot to init | ms | 66.10 | 404.40 | 6.12× faster |
+| null_syscall | ns | 353.66 | 84.41 | 4.19× slower |
+| fork_exit_wait | us | 37.83 | 23.41 | 1.62× slower |
+| fork_exec_wait | us | 347.38 | 117.65 | 2.95× slower |
+| memset_bandwidth | MB/s | 40,244.56 | 41,770.61 | 1.04× slower |
+| mmap_touch_munmap | us | 3.12 | 2.71 | 1.15× slower |
+| open_close | us | 1.30 | 0.58 | 2.24× slower |
+| stat | us | 1.05 | 0.37 | 2.84× slower |
+| file_read | MB/s | 10,404.25 | 11,581.73 | 1.11× slower |
+| pipe_latency | us | 3.56 | 1.84 | 1.93× slower |
+| unix_latency | us | 3.17 | 3.12 | 1.02× slower |
+| tcp_latency | us | 15.50 | 5.40 | 2.87× slower |
+| pipe_bandwidth | MB/s | 8,027.65 | 10,707.96 | 1.33× slower |
+| unix_bandwidth | MB/s | 8,882.61 | 10,904.26 | 1.23× slower |
+| tcp_bandwidth | MB/s | 3,741.45 | 7,416.24 | 1.98× slower |
+| file_write_4k | MB/s | 5,377.33 | 5,405.37 | 1.01× slower |
+| file_rewrite_4k | MB/s | 5,363.97 | 11,659.12 | 2.17× slower |
+| file_read_4k | MB/s | 5,209.07 | 8,662.77 | 1.66× slower |
+| file_rewrite_64k | MB/s | 10,489.42 | 13,736.53 | 1.31× slower |
+| file_read_64k | MB/s | 10,341.21 | 11,389.53 | 1.10× slower |
+| file_rewrite_1024k | MB/s | 9,435.77 | 13,573.38 | 1.44× slower |
+| file_read_1024k | MB/s | 7,903.53 | 11,420.56 | 1.44× slower |
+| exec-500 | ms | 61.10 | 42.60 | 1.43× slower |
+| exec-dynamic-200 | ms | 34.60 | 26.20 | 1.32× slower |
+| small-files-2000 | ms | 26.30 | 22.60 | 1.16× slower |
+| tar-go-src | ms | 40.60 | 34.20 | 1.19× slower |
+| untar-go-src | ms | 91.90 | 65.60 | 1.40× slower |
+| gunzip-go-binary | ms | 124.00 | 122.70 | 1.01× slower |
+| go-build-hello | ms | 11,893.40 | 7,274.70 | 1.63× slower |
+| redis SET | req/s | 52,110.47 | 123,915.74 | 2.38× slower |
+| redis GET | req/s | 52,056.22 | 122,850.12 | 2.36× slower |
+| redis INCR | req/s | 51,786.64 | 123,456.79 | 2.38× slower |
+| redis LPUSH | req/s | 48,053.82 | 110,132.16 | 2.29× slower |
+| redis LRANGE_100 | req/s | 27,382.26 | 39,339.10 | 1.44× slower |
+| redis-p16 SET | req/s | 493,339.94 | 747,384.12 | 1.51× slower |
+| redis-p16 GET | req/s | 558,347.31 | 931,966.50 | 1.67× slower |

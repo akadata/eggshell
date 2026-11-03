@@ -154,58 +154,39 @@ func (t *Task) pselect(nfds int, raddr, waddr, eaddr uint64, timeout int64) (uin
 
 	mm := t.proc.mm
 	words := (nfds + 63) / 64
+	b := make([]byte, words*8)
 
-	load := func(addr uint64) ([]uint64, Errno) {
-		set := make([]uint64, words)
+	// read, write and exception sets and their poll events
+	addrs := [3]uint64{raddr, waddr, eaddr}
+	events := [3]uint32{POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI}
+
+	var in, out [3][]uint64
+
+	for i, addr := range addrs {
+		in[i] = make([]uint64, words)
+		out[i] = make([]uint64, words)
 
 		if addr == 0 {
-			return set, 0
+			continue
 		}
 
-		for i := range set {
-			v, err := mm.readU64(addr + uint64(i)*8)
-
-			if err != 0 {
-				return nil, err
-			}
-
-			set[i] = v
+		if err := mm.copyIn(addr, b); err != 0 {
+			return fail(err)
 		}
 
-		return set, 0
+		binary.Decode(b, binary.LittleEndian, in[i])
 	}
 
-	rin, err := load(raddr)
-	if err != 0 {
-		return fail(err)
-	}
-
-	win, err := load(waddr)
-	if err != 0 {
-		return fail(err)
-	}
-
-	ein, err := load(eaddr)
-	if err != 0 {
-		return fail(err)
-	}
-
-	rout := make([]uint64, words)
-	wout := make([]uint64, words)
-	eout := make([]uint64, words)
 	n := 0
 	var badf bool
 
 	check := func() bool {
 		n = 0
-		clear(rout)
-		clear(wout)
-		clear(eout)
 
 		for fd := range nfds {
 			w, bit := fd/64, uint64(1)<<(fd%64)
 
-			if (rin[w]|win[w]|ein[w])&bit == 0 {
+			if (in[0][w]|in[1][w]|in[2][w])&bit == 0 {
 				continue
 			}
 
@@ -218,19 +199,13 @@ func (t *Task) pselect(nfds int, raddr, waddr, eaddr uint64, timeout int64) (uin
 
 			ev := f.poll()
 
-			if rin[w]&bit != 0 && ev&(POLLIN|POLLHUP|POLLERR) != 0 {
-				rout[w] |= bit
-				n++
-			}
+			for i := range in {
+				out[i][w] &^= bit
 
-			if win[w]&bit != 0 && ev&(POLLOUT|POLLERR) != 0 {
-				wout[w] |= bit
-				n++
-			}
-
-			if ein[w]&bit != 0 && ev&POLLPRI != 0 {
-				eout[w] |= bit
-				n++
+				if in[i][w]&bit != 0 && ev&events[i] != 0 {
+					out[i][w] |= bit
+					n++
+				}
 			}
 		}
 
@@ -245,30 +220,16 @@ func (t *Task) pselect(nfds int, raddr, waddr, eaddr uint64, timeout int64) (uin
 		return fail(EBADF)
 	}
 
-	store := func(addr uint64, set []uint64) Errno {
+	for i, addr := range addrs {
 		if addr == 0 {
-			return 0
+			continue
 		}
 
-		for i, v := range set {
-			if err := mm.writeU64(addr+uint64(i)*8, v); err != 0 {
-				return err
-			}
+		binary.Encode(b, binary.LittleEndian, out[i])
+
+		if err := mm.copyOut(addr, b); err != 0 {
+			return fail(err)
 		}
-
-		return 0
-	}
-
-	if err := store(raddr, rout); err != 0 {
-		return fail(err)
-	}
-
-	if err := store(waddr, wout); err != 0 {
-		return fail(err)
-	}
-
-	if err := store(eaddr, eout); err != 0 {
-		return fail(err)
 	}
 
 	return ok(n)
