@@ -1,0 +1,6 @@
+#!/bin/sh
+hostname -F /etc/hostname 2>/dev/null
+[ -x /etc/rc.local ] && /etc/rc.local
+cat /etc/motd
+cd /root
+exec /bin/bash --login

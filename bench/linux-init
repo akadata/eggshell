@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Linux initramfs init (rdinit=/root/bench/linux-init) running the suite.
+mount -t proc proc /proc
+mkdir -p /sys && mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+ip link set lo up
+hostname -F /etc/hostname
+sh /root/bench/guest.sh
+poweroff -f
