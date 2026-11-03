@@ -43,7 +43,7 @@ kernel: $(KERNEL)
 
 rootfs: rootfs/$(ARCH).tar
 
-$(VDSO):
+$(VDSO): kernel/vdso/vdso.c kernel/vdso/vdso.lds kernel/vdso/build.sh
 	kernel/vdso/build.sh
 
 .PHONY: $(KERNEL)

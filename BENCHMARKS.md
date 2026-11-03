@@ -7,14 +7,14 @@ QEMU `microvm` machine, with the same userland.
 Setup
 -----
 
-|                  | eggshell                                               | Linux                           |
-|------------------|--------------------------------------------------------|---------------------------------|
-| kernel           | eggshell (this tree, `tamago` go1.27.3)                | Ubuntu 7.0.0-38-generic         |
-| root file system | `rootfs/amd64.tar` embedded in the kernel              | `rootfs/amd64.tar` as initramfs |
-| host             | 8 vCPU Intel i7-1165Gt @ 2.80GHz                       | same                            |
-| machine          | QEMU 11.1.3 `microvm`, 1 vCPU, 2 GiB, `-cpu max` (KVM) | same                            |
-| networking       | virtio-net, gVisor TCP/IP                              | virtio-net, Linux TCP/IP        |
-| boot arguments   | `quiet ssh=0`                                          | `quiet`                         |
+|                  | eggshell                                                | Linux                           |
+|------------------|---------------------------------------------------------|---------------------------------|
+| kernel           | eggshell (this tree, `tamago` go1.27.3)                 | Ubuntu 7.0.0-38-generic         |
+| root file system | `rootfs/amd64.tar` embedded in the kernel               | `rootfs/amd64.tar` as initramfs |
+| host             | 8 vCPU Intel i7-1165G7 @ 2.80GHz                        | same                            |
+| machine          | QEMU 11.1.3 `microvm`, 1 vCPU, 2 GiB, `-cpu host` (KVM) | same                            |
+| networking       | virtio-net, gVisor TCP/IP                               | virtio-net, Linux TCP/IP        |
+| boot arguments   | `quiet ssh=0`                                           | `quiet`                         |
 
 ```sh
 # Linux kernel taken from Ubuntu 26.04.1 LTS

@@ -26,11 +26,11 @@ const (
 	EPOLL_CTL_MOD = 3
 )
 
-// pollWait blocks until ready returns true or the timeout (ns, negative
-// for infinite) expires.
 // tasks blocked in poll, select and epoll_wait
 var pollers waitQueue
 
+// pollWait blocks until check returns true or the timeout (ns, negative for
+// infinite) expires.
 func (t *Task) pollWait(check func() bool, timeout int64) Errno {
 	if check() || timeout == 0 {
 		return 0

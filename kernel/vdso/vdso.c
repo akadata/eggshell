@@ -11,8 +11,8 @@
 // clock, so that values obtained here and through the system calls are
 // identical.
 //
-// Built by build.sh, the resulting shared objects are committed and embedded
-// in the kernel.
+// Built by build.sh (make), the resulting shared objects are embedded in the
+// kernel.
 
 #include <stdint.h>
 
