@@ -58,7 +58,7 @@ scheduler.
  │  bash   redis-server   busybox   u-root    go   ...      │  musl ELF binaries
  └──────────────┬──────────────────────▲────────────────────┘
                 │                      │
-        syscall │   page fault, timer  │ mret/iretq
+        syscall │   page fault, timer  │ iretq
                 │                      │
  ┌──────────────▼──────────────────────┴────── Kernel mode ─┐
  │ monitor   GoTEE-style exec/return switch                 │
